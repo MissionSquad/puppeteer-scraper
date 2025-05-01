@@ -1,6 +1,6 @@
 {
   "name": "@missionsquad/puppeteer-scraper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "TypeScript URL scraper using Puppeteer",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -21,6 +21,7 @@
   "homepage": "https://github.com/missionsquad/puppeteer-scraper",
   "dependencies": {
     "@missionsquad/common": "^1.0.2",
+    "browsers": "^1.0.2",
     "dotenv": "^16.4.7",
     "puppeteer": "^24.4.0",
     "puppeteer-extra": "^3.3.6",
