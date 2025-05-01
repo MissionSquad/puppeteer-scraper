@@ -90,7 +90,7 @@ export function extractJsonLd(html: string): JsonLdArticle[] {
 
       const jsonData = JSON.parse(jsonString)
       if (Array.isArray(jsonData)) {
-        jsonData.forEach(item => {
+        jsonData.forEach((item) => {
           if (item['@type'] === 'NewsArticle' || item['@type'] === 'Article') {
             results.push(item)
           }
@@ -111,7 +111,10 @@ export function extractJsonLd(html: string): JsonLdArticle[] {
  */
 export function extractMetaContent(html: string, name: string): string | undefined {
   // First try exact property/name match
-  const regexExact = new RegExp(`<meta\\s+(?:content=["']([^"']*?)["']\\s+(?:name|property)=["']${name}["']|(?:name|property)=["']${name}["']\\s+content=["']([^"']*?)["'])\\s*/?>`, 'i')
+  const regexExact = new RegExp(
+    `<meta\\s+(?:content=["']([^"']*?)["']\\s+(?:name|property)=["']${name}["']|(?:name|property)=["']${name}["']\\s+content=["']([^"']*?)["'])\\s*/?>`,
+    'i'
+  )
   const matchExact = html.match(regexExact)
   if (matchExact) {
     return matchExact[1] || matchExact[2]
@@ -140,7 +143,9 @@ export function extractTitle(html: string): string {
  * Extracts canonical link with improved regex
  */
 export function extractCanonical(html: string): string | undefined {
-  const match = html.match(/<link[^>]*?rel=["']canonical["'][^>]*?href=["']([^"']+?)["'][^>]*?>|<link[^>]*?href=["']([^"']+?)["'][^>]*?rel=["']canonical["'][^>]*?>/)
+  const match = html.match(
+    /<link[^>]*?rel=["']canonical["'][^>]*?href=["']([^"']+?)["'][^>]*?>|<link[^>]*?href=["']([^"']+?)["'][^>]*?rel=["']canonical["'][^>]*?>/
+  )
   return match?.[1] || match?.[2]
 }
 
@@ -161,7 +166,7 @@ export function decodeHtmlEntities(text: string): string {
     '&#8220;': '"',
     '&#8221;': '"'
   }
-  return text.replace(/&[^;]+;/g, entity => entities[entity] || entity)
+  return text.replace(/&[^;]+;/g, (entity) => entities[entity] || entity)
 }
 
 /**
@@ -170,14 +175,15 @@ export function decodeHtmlEntities(text: string): string {
 export async function extractMetadata(page: Page): Promise<Metadata> {
   const html = await page.content()
   const jsonLdData = extractJsonLd(html)
-  const articleData = jsonLdData.find(data => data['@type'] === 'NewsArticle') || jsonLdData[0]
+  const articleData = jsonLdData.find((data) => data['@type'] === 'NewsArticle') || jsonLdData[0]
 
   // Extract and clean keywords
   const keywordsRaw = (extractMetaContent(html, 'keywords') || articleData?.keywords) ?? ''
-  const keywords = (Array.isArray(keywordsRaw)
-    ? keywordsRaw.map(k => decodeHtmlEntities(k.trim()))
-    : keywordsRaw.split(',').map(k => decodeHtmlEntities(k.trim()))
-  ).filter(k => k.trim() !== '')
+  const keywords = (
+    Array.isArray(keywordsRaw)
+      ? keywordsRaw.map((k) => decodeHtmlEntities(k.trim()))
+      : keywordsRaw.split(',').map((k) => decodeHtmlEntities(k.trim()))
+  ).filter((k) => k.trim() !== '')
 
   // Consolidate title from multiple sources
   const primaryTitle = decodeHtmlEntities(articleData?.headline || extractTitle(html))
@@ -187,7 +193,9 @@ export async function extractMetadata(page: Page): Promise<Metadata> {
   const title = primaryTitle || ogTitle || twitterTitle
 
   // Consolidate description from multiple sources
-  const primaryDescription = decodeHtmlEntities(articleData?.description || extractMetaContent(html, 'description') || '')
+  const primaryDescription = decodeHtmlEntities(
+    articleData?.description || extractMetaContent(html, 'description') || ''
+  )
   const ogDescription = decodeHtmlEntities(extractMetaContent(html, 'og:description') || '')
   const twitterDescription = decodeHtmlEntities(extractMetaContent(html, 'twitter:description') || '')
   // If primaryDescription is empty, fall back to ogDescription then twitterDescription.
@@ -197,21 +205,17 @@ export async function extractMetadata(page: Page): Promise<Metadata> {
   const rawImage = articleData?.image
   const rawOgImage = extractMetaContent(html, 'og:image')
   const imageCandidate = rawImage || rawOgImage
-  const image = decodeHtmlEntities(
-    Array.isArray(imageCandidate) ? imageCandidate[0] : (imageCandidate || '')
-  )
+  const image = decodeHtmlEntities(Array.isArray(imageCandidate) ? imageCandidate[0] : imageCandidate || '')
 
   const metadata: Metadata = {
     title,
     author: decodeHtmlEntities(
-      articleData?.author?.name ||
-      articleData?.creator?.name ||
-      extractMetaContent(html, 'author') ||
-      ''
+      articleData?.author?.name || articleData?.creator?.name || extractMetaContent(html, 'author') || ''
     ),
     description,
     keywords: keywords.length > 0 ? keywords : undefined,
-    publishDate: articleData?.datePublished || articleData?.dateCreated || extractMetaContent(html, 'article:published_time'),
+    publishDate:
+      articleData?.datePublished || articleData?.dateCreated || extractMetaContent(html, 'article:published_time'),
     modifiedDate: articleData?.dateModified || extractMetaContent(html, 'article:modified_time'),
     image,
     canonical: extractCanonical(html),
@@ -222,12 +226,12 @@ export async function extractMetadata(page: Page): Promise<Metadata> {
   }
 
   // Remove keys with undefined or empty string values.
-  Object.keys(metadata).forEach(key => {
+  Object.keys(metadata).forEach((key) => {
     const value = (metadata as { [key: string]: any })[key]
     if (value == null || (!Array.isArray(value) && value.trim() === '')) {
       delete (metadata as { [key: string]: any })[key]
     }
-  });
+  })
 
   return metadata
 }
@@ -262,7 +266,7 @@ export class PuppeteerScraper {
     'imageset',
     'media',
     'object',
-    'texttrack',
+    'texttrack'
   ]
 
   // Domains to block for optimization
@@ -280,7 +284,7 @@ export class PuppeteerScraper {
     'splunk',
     'newrelic',
     'google-analytics',
-    'googletagmanager',
+    'googletagmanager'
   ]
 
   constructor(options: ScraperOptions = { cacheSize: 250 }) {
@@ -332,9 +336,9 @@ export class PuppeteerScraper {
           '--mute-audio',
           '--no-default-browser-check',
           '--password-store=basic',
-          '--use-mock-keychain',
+          '--use-mock-keychain'
         ],
-        protocolTimeout: 30000,
+        protocolTimeout: 30000
       }
 
       // Configure GPU settings based on option
@@ -342,10 +346,7 @@ export class PuppeteerScraper {
         launchOptions.args.push('--disable-gpu')
       } else {
         // Enable GPU acceleration features with more stable settings
-        launchOptions.args.push(
-          '--enable-gpu-rasterization',
-          '--enable-zero-copy',
-        )
+        launchOptions.args.push('--enable-gpu-rasterization', '--enable-zero-copy')
       }
 
       if (this.options.proxyUrl) {
@@ -355,7 +356,6 @@ export class PuppeteerScraper {
       this.browser = await puppeteer.launch(launchOptions)
       // Create a new browser context
       this.context = await this.browser.createBrowserContext()
-      
     } catch (error) {
       await this.closeBrowser() // Ensure cleanup on error
       throw new Error(`Failed to initialize browser: ${(error as Error).message}`)
@@ -375,11 +375,11 @@ export class PuppeteerScraper {
 
     if (this.options.blockResources) {
       await page.setRequestInterception(true)
-      page.on('request', request => {
+      page.on('request', (request) => {
         const requestUrl = request.url().split('?')[0]
         if (
           this.blockResourceType.includes(request.resourceType()) ||
-          this.blockResourceName.some(resource => requestUrl.includes(resource))
+          this.blockResourceName.some((resource) => requestUrl.includes(resource))
         ) {
           request.abort()
         } else {
@@ -503,7 +503,7 @@ export class PuppeteerScraper {
       // Extract current data
       const newData = await page.$$eval(
         selector,
-        (elements, extractor) => elements.map(el => extractor(el)),
+        (elements, extractor) => elements.map((el) => extractor(el)),
         extractData
       )
       results.push(...newData)
