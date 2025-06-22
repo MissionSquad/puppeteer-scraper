@@ -13,6 +13,7 @@ export interface ScraperOptions {
   blockResources?: boolean
   cacheSize: number
   enableGPU?: boolean // New option for GPU support
+  useConsoleError?: boolean
 }
 
 export interface Metadata {
@@ -255,6 +256,7 @@ export class PuppeteerScraper {
   private context: BrowserContext | null = null
   private pages: Map<string, Page> = new Map()
   private cache: SuperLRU<string, PageContent>
+  private useConsoleError = false
   private readonly options: ScraperOptions
 
   // Resource types to block for optimization
@@ -296,6 +298,9 @@ export class PuppeteerScraper {
       ...options
     }
     this.cache = new SuperLRU({ maxSize: this.options.cacheSize, compress: true })
+    if (options.useConsoleError) {
+      this.useConsoleError = true
+    }
   }
 
   async init(): Promise<void> {
@@ -360,7 +365,7 @@ export class PuppeteerScraper {
       await this.closeBrowser() // Ensure cleanup on error
       throw new Error(`Failed to initialize browser: ${(error as Error).message}`)
     }
-    log({ level: 'debug', msg: 'PuppeteerScraper initialized' })
+    log({ level: 'info', msg: 'PuppeteerScraper initialized' }, this.useConsoleError)
   }
 
   private async openNewPage(): Promise<Page> {
@@ -413,7 +418,7 @@ export class PuppeteerScraper {
   ): Promise<void> {
     const page = this.pages.get(id)
     if (!page) throw new Error('Page not initialized')
-    log({ level: 'info', msg: `Scraping page: ${url}` })
+    log({ level: 'info', msg: `Scraping page: ${url}` }, this.useConsoleError)
     try {
       await page.goto(url, { waitUntil })
     } catch (error) {
@@ -474,9 +479,9 @@ export class PuppeteerScraper {
       try {
         await page.close()
         this.pages.delete(id)
-        log({ level: 'debug', msg: `Closed page ${id}` })
+        log({ level: 'debug', msg: `Closed page ${id}` }, this.useConsoleError)
       } catch (error) {
-        log({ level: 'error', msg: `Error cleaning up page: ${error}` })
+        log({ level: 'error', msg: `Error cleaning up page: ${error}` }, this.useConsoleError)
       }
     }
   }
@@ -541,7 +546,7 @@ export class PuppeteerScraper {
       await this.cache.set(id, pageContent)
       return pageContent
     } catch (err) {
-      log({ level: 'error', msg: `Error scraping page: ${err}` })
+      log({ level: 'error', msg: `Error scraping page: ${err}` }, this.useConsoleError)
       return undefined
     }
   }

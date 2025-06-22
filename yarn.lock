@@ -1164,10 +1164,10 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@missionsquad/common@^1.0.2":
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/@missionsquad/common/-/common-1.0.2.tgz#56733658de238b584a881cf488bb0d0fda9e66b2"
-  integrity sha512-is0ZTRBSS3b1Sqb5e6SyQJtSWuxV1J/S3HNWG3Fs5RZ7GayJyDMvJ9BpooJi4iD4BywcJJWpCkGVAwb97fYYhA==
+"@missionsquad/common@^1.1.0":
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/@missionsquad/common/-/common-1.1.0.tgz#ac0f2f78aaecbca2851a109a6fb8b0bef3017c3b"
+  integrity sha512-IJ/kU3WOkKEQlka7tCPqozAmwN9UtWddD7reuqQ4D4RH5bvxVgh0lL3IIv0HYeFWZ+uCjQdY2RnKr7Yxe9AbtA==
   dependencies:
     nanoid "3.3.10"
 
