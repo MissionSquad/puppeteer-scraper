@@ -14,6 +14,12 @@ export interface ScraperOptions {
   cacheSize: number
   enableGPU?: boolean // New option for GPU support
   useConsoleError?: boolean
+  // waitUntil condition used by scrapePage when navigating. Defaults to 'networkidle2'
+  // ('networkidle0' routinely times out on pages with persistent analytics/websocket traffic).
+  scrapeWaitUntil?: 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2'
+  // Maximum age (ms) a registered page may reach before the stale-page sweep closes it.
+  // Defaults to 120000.
+  maxPageAgeMs?: number
 }
 
 export interface Metadata {
@@ -255,6 +261,10 @@ export class PuppeteerScraper {
   private browser: Browser | null = null
   private context: BrowserContext | null = null
   private pages: Map<string, Page> = new Map()
+  // Parallel map of page-id -> creation timestamp (ms), used by the stale-page sweep.
+  private pageTimestamps: Map<string, number> = new Map()
+  // Monotonic counter guaranteeing a unique pages-Map key per scrapePage call.
+  private pageSequence = 0
   private cache: SuperLRU<string, PageContent>
   private useConsoleError = false
   private readonly options: ScraperOptions
@@ -478,10 +488,14 @@ export class PuppeteerScraper {
     if (page) {
       try {
         await page.close()
-        this.pages.delete(id)
         log({ level: 'debug', msg: `Closed page ${id}` }, this.useConsoleError)
       } catch (error) {
+        // Best-effort close: a close timeout must NOT leave the Map entry orphaned,
+        // so the delete happens in finally regardless of whether close() throws.
         log({ level: 'error', msg: `Error cleaning up page: ${error}` }, this.useConsoleError)
+      } finally {
+        this.pages.delete(id)
+        this.pageTimestamps.delete(id)
       }
     }
   }
@@ -533,21 +547,54 @@ export class PuppeteerScraper {
     return newHeight !== prevHeight
   }
 
-  public async scrapePage(url: string) {
-    const id = md5(url)
-    const cached = await this.cache.get(id)
+  /**
+   * Defense-in-depth, timer-free sweep of registered pages. Closes (via closePage)
+   * any page whose creation timestamp is older than maxPageAgeMs. Guarantees tabs
+   * cannot accumulate even if some future code path misses cleanup.
+   */
+  private async sweepStalePages(maxPageAgeMs: number): Promise<void> {
+    const now = Date.now()
+    const staleIds: string[] = []
+    for (const [pageId, createdAt] of this.pageTimestamps) {
+      if (now - createdAt > maxPageAgeMs) {
+        staleIds.push(pageId)
+      }
+    }
+    for (const pageId of staleIds) {
+      log({ level: 'debug', msg: `Sweeping stale page ${pageId}` }, this.useConsoleError)
+      await this.closePage(pageId)
+    }
+  }
+
+  public async scrapePage(url: string): Promise<PageContent | undefined> {
+    const maxPageAgeMs = this.options.maxPageAgeMs ?? 120000
+    // Defense-in-depth: close any registered page that has outlived maxPageAgeMs
+    // before starting new work, so tabs cannot accumulate.
+    await this.sweepStalePages(maxPageAgeMs)
+
+    const cacheId = md5(url)
+    const cached = await this.cache.get(cacheId)
     if (cached) return cached
+
+    // Unique per-call id so concurrent scrapes of the same URL never overwrite
+    // (and thereby orphan) each other's pages Map entry.
+    const id = `${cacheId}:${++this.pageSequence}`
+    const waitUntil = this.options.scrapeWaitUntil ?? 'networkidle2'
     try {
       const page = await this.openNewPage()
       this.pages.set(id, page)
-      await this.navigateToPage(id, url, 'networkidle0')
+      this.pageTimestamps.set(id, Date.now())
+      await this.navigateToPage(id, url, waitUntil)
       const pageContent = await this.getContent(id)
-      await this.closePage(id)
-      await this.cache.set(id, pageContent)
+      await this.cache.set(cacheId, pageContent)
       return pageContent
     } catch (err) {
       log({ level: 'error', msg: `Error scraping page: ${err}` }, this.useConsoleError)
       return undefined
+    } finally {
+      // Always runs on success and failure alike: the catch path previously never
+      // closed the page, orphaning a Chromium tab on every failed scrape.
+      await this.closePage(id)
     }
   }
 }
